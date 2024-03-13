@@ -1,0 +1,54 @@
+meta {
+  name: Get product's details
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/product/{{productId}}
+  body: none
+  auth: none
+}
+
+docs {
+  `GET /v1/product/{productId}`
+  - Success:
+          - **`200`** returns product details
+          - Body
+          
+          ```jsx
+          {
+          	"message": "ok",
+          	"data": {
+          		"product":{
+          			"productId": "",
+          			"name": "",
+          			"price": 10000,
+          			"imageUrl" : "",
+          			"stock" : 10,
+          			"condition": "new | second",
+          			"tags": [""],
+          			"isPurchaseable": true,
+          			"purchaseCount": 2
+          		},
+          		seller: {
+          			"name": "namadepan namabelakang",
+          			"productTotal": 20,
+          			"purchaseTotal": 20,
+          			"bankAccounts":[
+          				{
+          					"bankAccountId":"",
+          					"bankName":"",
+          					"bankAccountName":"",
+          					"bankAccountNumber":""
+          				}
+          			]
+          		}
+          	}
+          }
+          ```
+          
+  - Errors
+          - `404` not found
+          - **`500`** if there's an error fetching the product
+}

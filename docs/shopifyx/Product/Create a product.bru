@@ -1,0 +1,47 @@
+meta {
+  name: Create a product
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/product
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "", // not null, minLength 5, maxLength 60
+    "price": 10000, // not null, min 0
+    "imageUrl" : "", // not null, url=true
+    "stock" : 10, // not null, min 0
+    "condition": "new | second", // not null, must only accept enum
+    "tags": [""], // not null, minItems 0
+    "isPurchaseable": true // not null
+  }
+}
+
+docs {
+  `POST /v1/product`
+  - Request
+      
+      ```jsx
+      {
+      	"name": "", // not null, minLength 5, maxLength 60
+      	"price": 10000, // not null, min 0
+      	"imageUrl" : "", // not null, url=true
+      	"stock" : 10, // not null, min 0
+      	"condition": "new | second", // not null, must only accept enum
+      	"tags": [""], // not null, minItems 0
+      	"isPurchaseable": true // not null
+      }
+      ```
+      
+  - Success:
+      - **`200`** product added successfully
+  - Errors:
+      - **`400`** if required fields are missing or invalid (e.g., price, name, category)
+      - `403` forbidden
+      - **`500`** if there's an internal server error
+}

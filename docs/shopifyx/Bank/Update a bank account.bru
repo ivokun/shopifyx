@@ -1,0 +1,41 @@
+meta {
+  name: Update a bank account
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/v1/bank/account/{{bankAccountId}}
+  body: json
+  auth: none
+}
+
+body:json {
+    {
+      "bankAccountId":"", // not null
+      "bankName":"", // not null, minLength 5, maxLength 15
+      "bankAccountName":"", // not null, minLength 5, maxLength 15
+      "bankAccountNumber":"" // not null, minLength 5, maxLength 15
+    }
+}
+
+docs {
+  `PATCH /v1/bank/account/{bankAccountId}`
+  - Request
+      
+      ```jsx
+      	{
+      		"bankAccountId":"", // not null
+      		"bankName":"", // not null, minLength 5, maxLength 15
+      		"bankAccountName":"", // not null, minLength 5, maxLength 15
+      		"bankAccountNumber":"" // not null, minLength 5, maxLength 15
+      	}
+      ```
+      
+  - Response:
+    - **`200`** account updated successfully
+  - Errors:
+    - **`400`** if required details are missing or invalid
+    - **`404`** if account not found
+    - **`500`** if update fails
+}

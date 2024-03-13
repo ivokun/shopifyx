@@ -1,0 +1,21 @@
+meta {
+  name: Delete a product
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/v1/product/{{productId}}
+  body: none
+  auth: none
+}
+
+docs {
+  `DELETE /v1/product/{productId}`
+  - Success:
+    - **`200`** product deleted successfully
+  - Errors:
+    - **`404`** if product not found
+    - **`403`** forbidden
+    - **`500`** if deletion fails
+}

@@ -1,0 +1,52 @@
+meta {
+  name: Get some products
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/product?userOnly=false&limit=25&offset=0&tags&condition=new&showEmptyStock=true&maxPrice=99999999999999&minPrice=0&sortBy=price&orderBy=asc&search
+  body: none
+  auth: none
+}
+
+query {
+  userOnly: false
+  limit: 25
+  offset: 0
+  tags: 
+  condition: new
+  showEmptyStock: true
+  maxPrice: 99999999999999
+  minPrice: 0
+  sortBy: price
+  orderBy: asc
+  search: 
+}
+
+docs {
+  `GET /v1/product`
+    - param (semuanya optional)
+      - `userOnly` (boolean)
+        - `true` return products that only this user have
+      - `limit` & `offset` (number)
+        - display how much data in single request
+      - `tags` ([]string) `tags=clothes&tags=bird`
+          - filter based on tags
+      - `condition` (”new”|”second”)
+          - filter based on condition
+      - `showEmptyStock` (boolean)
+          - `true` return products that also have empty stocks
+      - `maxPrice` & `minPrice` (number)
+          - display the range of price that should be displayed
+      - `sortBy` (”price”|”date”)
+          - display the range of price that should be displayed
+      - `orderBy` (”asc”|”dsc”)
+      - `search` (string)
+        - display product that contains the name of search
+  - Success:
+      - **`200`** returns product details
+  - Errors:
+      - `403` forbidden
+      - **`500`** if there's an error fetching the product
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Upsert a stock
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/product/{{productId}}/stock
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "stock" : 10 // not null, min 0
+  }
+}
+
+docs {
+  `POST /v1/product/{productId}/stock`
+  - Request
+      
+      ```jsx
+      {
+      	"stock" : 10 // not null, min 0
+      }
+      ```
+      
+  - Success:
+    - **`200`** stock updated successfully
+  - Errors:
+    - **`400`** if the quantity is invalid
+    - **`404`** if product not found
+    - `403` forbidden
+    - **`500`** if update fails
+}

@@ -1,0 +1,39 @@
+meta {
+  name: Create a bank account
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/bank/account
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "bankName":"", // not null, minLength 5, maxLength 15
+    "bankAccountName":"", // not null, minLength 5, maxLength 15
+    "bankAccountNumber":"" // not null, minLength 5, maxLength 15
+  }
+}
+
+docs {
+  `POST /v1/bank/account`
+  - Request
+      
+      ```jsx
+      {
+      	"bankName":"", // not null, minLength 5, maxLength 15
+      	"bankAccountName":"", // not null, minLength 5, maxLength 15
+      	"bankAccountNumber":"" // not null, minLength 5, maxLength 15
+      }
+      ```
+      
+  - Response:
+    - **`200`** account added successfully/code
+  - Errors:
+    - **`400`** if required details are missing or invalid
+    - `403` forbidden
+    - **`500`** if adding fails
+}
