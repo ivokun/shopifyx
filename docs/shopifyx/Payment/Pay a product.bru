@@ -1,0 +1,40 @@
+meta {
+  name: Pay a product
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/product/{{productId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+      "productId":"", // not null, must be a correct product id
+      "bankAccountId":"", // not null, must be a correct bank account id
+      "paymentProofImageUrl":"", // not null, must be a correct url
+      "quantity":10 // not null, min 1
+  }
+}
+
+docs {
+  `POST /v1/product/{productId}/buy`
+  - Request
+      
+      ```jsx
+      {
+      		"productId":"", // not null, must be a correct product id
+      		"bankAccountId":"", // not null, must be a correct bank account id
+      		"paymentProofImageUrl":"", // not null, must be a correct url
+      		"quantity":10 // not null, min 1
+      }
+      ```
+      
+  - Response:
+          - **`200`** payment processed successfully
+  - Errors:
+          - **`400`** if payment details are invalid (e.g., insufficient quantity, incorrect payment information)
+          - **`500`** if processing fails
+}

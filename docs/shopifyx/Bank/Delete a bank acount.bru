@@ -1,0 +1,20 @@
+meta {
+  name: Delete a bank acount
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/v1/bank/account/{{bankAccountId}}
+  body: none
+  auth: none
+}
+
+docs {
+  DELETE /v1/bank/account/{bankAccountId}
+  - Success:
+    - **`200`** account deleted successfully
+  - Errors:
+    - **`404`** if account not found
+    - **`500`** if deletion fails
+}

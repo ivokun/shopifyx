@@ -1,0 +1,46 @@
+meta {
+  name: Update a product
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/v1/product/{{productId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "", // not null, minLength 5, maxLength 60
+    "price": 10000, // not null, min 0
+    "imageUrl" : "", // not null, must in url format
+    "condition": "new | second", // not null, must only accept enum
+    "tags": [""], // not null, minItems 0
+    "isPurchaseable": true // not null
+  }
+}
+
+docs {
+  `PATCH /v1/product/{productId}`
+  - Request
+      
+      ```jsx
+      {
+      	"name": "", // not null, minLength 5, maxLength 60
+      	"price": 10000, // not null, min 0
+      	"imageUrl" : "", // not null, must in url format
+      	"condition": "new | second", // not null, must only accept enum
+      	"tags": [""], // not null, minItems 0
+      	"isPurchaseable": true // not null
+      }
+      ```
+      
+  - Success:
+    - **`200`** product updated successfully
+  - Errors:
+    - **`400`** if required fields are missing or invalid
+    - **`404`** if product not found
+    - `403` forbidden
+    - **`500`** if update fails
+}

@@ -1,0 +1,51 @@
+meta {
+  name: User Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/user/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "username": "seseorang", // not null, minLength 5, maxLength 15
+    "password": "" // not null, minLength 5, maxLength 15
+  }
+}
+
+docs {
+  `POST /v1/user/login`
+  - Request
+      
+      ```jsx
+      {
+      	"username": "seseorang", // not null, minLength 5, maxLength 15
+      	"password": "" // not null, minLength 5, maxLength 15
+      }
+      ```
+      
+  - Response
+          - `200` User successfully logged
+          
+          ```jsx
+          {
+              "message": "User logged successfully"
+              "data": {
+                  "username": "seseorang",
+                  "name": "namadepan namabelakang", 
+                  "accessToken": "qwertyuiopasdfghjklzxcvbnm", // 2 menit (untuk pengetesan hari minggu, saat development bebas)
+          	   }
+          }
+          
+          ```
+          
+  - Error
+          - `404` if user not found
+          - `400` if password is wrong
+          - `400` if password / username is too short or long
+          - `500` if server error
+}
