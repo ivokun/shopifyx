@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  app:
+    image: "cosmtrek/air"
+    working_dir: /opt/app/api
+    ports:
+      - 8000:8000
+    volumes:
+      - .:/opt/app/api
