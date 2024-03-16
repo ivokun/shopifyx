@@ -4,7 +4,14 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-chi/render"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq" // PostgreSQL driver
+	"golang.org/x/crypto/bcrypt"
+	"log"
+	"os"
+	"strconv"
 	"time"
 	// "github.com/oklog/ulid/v2"
 	"net/http"
@@ -27,12 +34,39 @@ func ErrInvalidRequest(err error) render.Renderer {
 	}
 }
 
+func ErrServer(err error) render.Renderer {
+	return &ErrResponse{
+		Err:            err,
+		HTTPStatusCode: 500,
+		StatusText:     "Server error",
+		Message:        err.Error(),
+	}
+}
+
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.HTTPStatusCode)
 	return nil
 }
 
 func main() {
+	// Connection string for a remote PostgreSQL database
+	connStr := "postgres://api:awesomepassword@db:5432/api?sslmode=disable"
+
+	// Open a connection to the remote database
+	db, err := sqlx.Connect("postgres", connStr)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer db.Close()
+
+	// Test the connection
+	err = db.Ping()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println("Connected to the remote database!")
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.AllowContentType("application/json"))
@@ -40,16 +74,16 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
-	r.Mount("/v1", AppRouter())
+	r.Mount("/v1", AppRouter(db))
 	http.ListenAndServe(":8000", r)
 }
 
-func AppRouter() chi.Router {
+func AppRouter(db *sqlx.DB) chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok gas, ok gas"))
 	})
-	r.Mount("/user", UserRouter())
+	r.Mount("/user", UserRouter(db))
 	return r
 }
 
@@ -79,7 +113,7 @@ type UserLoginRequest struct {
 }
 
 type UserWithToken struct {
-	User
+	*User
 	AccessToken string `json:"accessToken"`
 }
 
@@ -88,13 +122,17 @@ type UserRegisterResponse struct {
 	Data UserWithToken `json:"data"`
 }
 
-func UserRouter() chi.Router {
+func UserRouter(db *sqlx.DB) chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok gas, ok gas"))
 	})
-	r.Post("/register", userRegistrationHandler)
-	r.Post("/login", userLoginHandler)
+	r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
+		UserRegistrationHandler(w, r, db)
+	})
+	r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+		UserLoginHandler(w, r, db)
+	})
 	return r
 }
 
@@ -103,7 +141,7 @@ func isValidPassword(password string) bool {
 }
 
 func isValidUserName(username string) bool {
-	return len(username) >= 5 && len(username) <= 50
+	return len(username) >= 5 && len(username) <= 15
 }
 
 func NewUserRegisterResponse(data *UserWithToken) *UserRegisterResponse {
@@ -132,7 +170,38 @@ func (rd *UserRegisterResponse) Render(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
-func userRegistrationHandler(w http.ResponseWriter, r *http.Request) {
+func generateToken(user *User) (string, error) {
+	_, token, err := jwtauth.New("HS256", []byte("secret"), nil).Encode(map[string]interface{}{"user_id": user.ID})
+	return token, err
+}
+
+func hashPassword(password string) (string, error) {
+	saltLength, err := strconv.Atoi(os.Getenv("BCRYPT_SALT"))
+
+	if err != nil {
+		return "", err
+	}
+
+	if saltLength <= 0 {
+		saltLength = 8
+	}
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), saltLength)
+	return string(bytes), err
+}
+
+func comparePassword(hashedPassword, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
+}
+
+func getUserByUserName(db *sqlx.DB, username string) (*User, error) {
+	query := `SELECT * FROM users WHERE username = $1`
+	data := &User{}
+	err := db.Get(data, query, username)
+	return data, err
+}
+
+func UserRegistrationHandler(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 	payload := &UserRegisterRequest{}
 
 	if err := render.Decode(r, payload); err != nil {
@@ -145,16 +214,30 @@ func userRegistrationHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hashedPassword, err := hashPassword(payload.Password)
+
+	if err != nil {
+		render.Render(w, r, ErrServer(fmt.Errorf("Something wrong, please try again.")))
+		return
+	}
+
+	token, err := generateToken(&User{ID: "1"})
+
+	if err != nil {
+		render.Render(w, r, ErrServer(fmt.Errorf("Error generating token, please try again.")))
+		return
+	}
+
 	data := &UserWithToken{
-		User:        payload.User,
-		AccessToken: "token",
+		User:        &payload.User,
+		AccessToken: token,
 	}
 
 	render.Status(r, http.StatusCreated)
 	render.Render(w, r, NewUserRegisterResponse(data))
 }
 
-func userLoginHandler(w http.ResponseWriter, r *http.Request) {
+func UserLoginHandler(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 	payload := &UserLoginRequest{}
 
 	if err := render.Decode(r, payload); err != nil {
@@ -162,17 +245,33 @@ func userLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isValidPassword(payload.Password) && !isValidUserName(payload.UserName) {
+	if !isValidPassword(payload.Password) || !isValidUserName(payload.UserName) {
 		render.Render(w, r, ErrInvalidRequest(fmt.Errorf("Invalid username or password")))
 		return
 	}
 
+	user, err := getUserByUserName(db, payload.UserName)
+
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(fmt.Errorf("Invalid username or password")))
+		return
+	}
+
+	if !comparePassword(user.Password, payload.Password) {
+		render.Render(w, r, ErrInvalidRequest(fmt.Errorf("Invalid username or password")))
+		return
+	}
+
+	token, err := generateToken(&User{ID: "1"})
+
+	if err != nil {
+		render.Render(w, r, ErrServer(fmt.Errorf("Error generating token, please try again.")))
+		return
+	}
+
 	data := &UserWithToken{
-		User: User{
-			UserName: payload.UserName,
-			Name:     "John Doe",
-		},
-		AccessToken: "token",
+		User:        user,
+		AccessToken: token,
 	}
 
 	render.Status(r, http.StatusOK)
