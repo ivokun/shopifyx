@@ -13,6 +13,7 @@ $$;
 CREATE TABLE IF NOT EXISTS products(
   id TEXT PRIMARY KEY,
   name VARCHAR (60) NOT NULL,
+  price INT NOT NULL,
   imageUrl TEXT NOT NULL,
   condition valid_conditions NOT NULL,
   is_purchaseable BOOLEAN NOT NULL,
