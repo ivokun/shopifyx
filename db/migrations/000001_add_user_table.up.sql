@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS users(
   id TEXT PRIMARY KEY,
+  name VARCHAR (50) NOT NULL,
   username VARCHAR (50) UNIQUE NOT NULL,
-  password VARCHAR (50) NOT NULL,
+  password TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT (TIMEZONE('UTC', NOW())),
   deleted_at TIMESTAMP
 );
