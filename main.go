@@ -71,6 +71,11 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	_, err = db.Exec(`SELECT 1`)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	fmt.Println("Connected to the remote database!")
 
 	r := chi.NewRouter()
