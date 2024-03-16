@@ -8,13 +8,13 @@ import (
 	"github.com/go-chi/render"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // PostgreSQL driver
+	"github.com/oklog/ulid/v2"
 	"golang.org/x/crypto/bcrypt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
-	// "github.com/oklog/ulid/v2"
-	"net/http"
 )
 
 type ErrResponse struct {
@@ -34,10 +34,10 @@ func ErrInvalidRequest(err error) render.Renderer {
 	}
 }
 
-func ErrServer(err error) render.Renderer {
+func ErrServer(err error, statusCode int) render.Renderer {
 	return &ErrResponse{
 		Err:            err,
-		HTTPStatusCode: 500,
+		HTTPStatusCode: statusCode,
 		StatusText:     "Server error",
 		Message:        err.Error(),
 	}
@@ -94,12 +94,12 @@ type BaseResponse struct {
 // Auth section
 
 type User struct {
-	ID        string    `json:"-" db:"id"`
-	Name      string    `json:"name" sql:"name"`
-	UserName  string    `json:"username" sql:"username"`
-	Password  string    `json:"-" sql:"password"`
-	CreatedAt time.Time `json:"-" db:"created_at"`
-	DeletedAt time.Time `json:"-" db:"deleted_at"`
+	ID        string     `json:"-" db:"id"`
+	Name      string     `json:"name" sql:"name"`
+	UserName  string     `json:"username" sql:"username"`
+	Password  string     `json:"-" sql:"password"`
+	CreatedAt time.Time  `json:"-" db:"created_at"`
+	DeletedAt *time.Time `json:"-" db:"deleted_at"`
 }
 
 type UserRegisterRequest struct {
@@ -122,20 +122,7 @@ type UserRegisterResponse struct {
 	Data UserWithToken `json:"data"`
 }
 
-func UserRouter(db *sqlx.DB) chi.Router {
-	r := chi.NewRouter()
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok gas, ok gas"))
-	})
-	r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-		UserRegistrationHandler(w, r, db)
-	})
-	r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-		UserLoginHandler(w, r, db)
-	})
-	return r
-}
-
+// User utils
 func isValidPassword(password string) bool {
 	return len(password) >= 5 && len(password) <= 15
 }
@@ -189,16 +176,50 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), err
 }
 
-func comparePassword(hashedPassword, password string) bool {
+func comparePassword(hashedPassword string, password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err == nil
 }
 
+// User database operations
 func getUserByUserName(db *sqlx.DB, username string) (*User, error) {
 	query := `SELECT * FROM users WHERE username = $1`
 	data := &User{}
 	err := db.Get(data, query, username)
 	return data, err
+}
+
+func createUser(db *sqlx.DB, user *User) error {
+	_, err := db.NamedExec(`INSERT INTO users (id, name, username, password) VALUES (:id, :name, :username, :password)`, user)
+	return err
+}
+
+func parseDBErrorMessage(err error) (error, int) {
+	errorMessage := err.Error()
+	if errorMessage == "pq: duplicate key value violates unique constraint \"users_username_key\"" {
+		return fmt.Errorf("Username already exists"), http.StatusConflict
+	}
+
+	if errorMessage == "sql: no rows in result set" {
+		return fmt.Errorf("Not found"), http.StatusNotFound
+	}
+	return fmt.Errorf("Error creating user, please try again."), http.StatusInternalServerError
+}
+
+// User router
+
+func UserRouter(db *sqlx.DB) chi.Router {
+	r := chi.NewRouter()
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok gas, ok gas"))
+	})
+	r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
+		UserRegistrationHandler(w, r, db)
+	})
+	r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+		UserLoginHandler(w, r, db)
+	})
+	return r
 }
 
 func UserRegistrationHandler(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
@@ -217,14 +238,28 @@ func UserRegistrationHandler(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	hashedPassword, err := hashPassword(payload.Password)
 
 	if err != nil {
-		render.Render(w, r, ErrServer(fmt.Errorf("Something wrong, please try again.")))
+		render.Render(w, r, ErrServer(fmt.Errorf("Something wrong, please try again."), http.StatusInternalServerError))
 		return
 	}
 
-	token, err := generateToken(&User{ID: "1"})
+	user := &User{
+		ID:       ulid.Make().String(),
+		Name:     payload.User.Name,
+		UserName: payload.User.UserName,
+		Password: hashedPassword,
+	}
+
+	err = createUser(db, user)
 
 	if err != nil {
-		render.Render(w, r, ErrServer(fmt.Errorf("Error generating token, please try again.")))
+		render.Render(w, r, ErrServer(parseDBErrorMessage(err)))
+		return
+	}
+
+	token, err := generateToken(user)
+
+	if err != nil {
+		render.Render(w, r, ErrServer(fmt.Errorf("Error generating token, please try again."), http.StatusInternalServerError))
 		return
 	}
 
@@ -253,7 +288,7 @@ func UserLoginHandler(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 	user, err := getUserByUserName(db, payload.UserName)
 
 	if err != nil {
-		render.Render(w, r, ErrInvalidRequest(fmt.Errorf("Invalid username or password")))
+		render.Render(w, r, ErrServer(parseDBErrorMessage(err)))
 		return
 	}
 
@@ -262,10 +297,10 @@ func UserLoginHandler(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 		return
 	}
 
-	token, err := generateToken(&User{ID: "1"})
+	token, err := generateToken(user)
 
 	if err != nil {
-		render.Render(w, r, ErrServer(fmt.Errorf("Error generating token, please try again.")))
+		render.Render(w, r, ErrServer(fmt.Errorf("Error generating token, please try again."), http.StatusInternalServerError))
 		return
 	}
 
